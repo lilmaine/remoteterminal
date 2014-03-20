@@ -10,8 +10,10 @@ entity pico_top_level is
 				 switch: in STD_LOGIC_VECTOR(7 downto 0);
 				 LED: out STD_LOGIC_VECTOR(7 downto 0);
 				 reset: in STD_LOGIC;
-				 BTN0: in STD_LOGIC
-         );
+				 BTN: in STD_LOGIC;
+				 uart_rx : in std_logic;
+				 uart_tx : out std_logic
+			);
 end pico_top_level;
 
 architecture Behavioral of pico_top_level is
@@ -46,6 +48,14 @@ architecture Behavioral of pico_top_level is
                     rdl : out std_logic;                    
                     clk : in std_logic);
   end component;
+
+  	COMPONENT clk_to_baud
+	PORT(
+		clk : IN std_logic;
+		reset : IN std_logic;          
+		baud_16x_en : OUT std_logic
+		);
+	END COMPONENT;
   
   component uart_tx6
 		Port ( data_in : in std_logic_vector(7 downto 0);
@@ -88,13 +98,15 @@ signal       interrupt : std_logic;
 signal   interrupt_ack : std_logic;
 signal    kcpsm6_sleep : std_logic;
 signal    kcpsm6_reset : std_logic;
+signal	read_available: std_logic;
+signal	write_available: std_logic;
 signal 	 LEDS: STD_LOGIC_VECTOR(7 downto 0);
 signal SWS: STD_LOGIC_VECTOR(7 downto 0);
 signal BTNSS: STD_LOGIC_VECTOR(7 downto 0);
 --
 --Signals used for the Baud rate
 --
-signal baud_count : integer range 0 to 325 := 0;
+signal baud_count : integer range 0 to 651 := 0;
 signal en_16_x_baud : std_logic := '0';
 --
 -- Signals used to connect UART_TX6
@@ -118,11 +130,13 @@ signal        uart_rx_reset : std_logic;
 begin
 
 
-  --
-  -- In many designs (especially your first) interrupt and sleep are not used.
-  -- Tie these inputs Low until you need them. Tying 'interrupt' to 'interrupt_ack' 
-  -- preserves both signals for future use and avoids a warning message.
-  -- 
+Inst_clk_to_baud: clk_to_baud PORT MAP(
+	clk => clk,
+	reset => reset,
+	baud_16x_en =>  en_16_x_baud
+);
+
+
   kcpsm6_sleep <= '0';
   interrupt <= interrupt_ack;
 processor: kcpsm6
@@ -156,40 +170,68 @@ processor: kcpsm6
 
 
 
-	output_ports: process( clk, write_strobe)
-	begin
-		LEDS <= LEDS;
-		if(rising_edge(clk) and write_strobe='1') then
-			if(port_id=x"07") then
-				LED <= out_port;
-			end if;
-		end if;
-	end process;
+--	output_ports: process( clk, write_strobe)
+--	begin
+--		LEDS <= LEDS;
+--		if(rising_edge(clk) and write_strobe='1') then
+--			if(port_id=x"07") then
+--				LED <= out_port;
+--			end if;
+--		end if;
+--	end process;
+--
+--	input_ports: process( clk, read_strobe)
+--	begin
+--		if(rising_edge(clk) and read_strobe='1') then
+--			if(port_id=X"AF") then
+--				in_port <= switch;
+--			end if;
+--			if(port_id=X"07") then
+--				in_port <= BTN & BTN & BTN & BTN & BTN & BTN & BTN & BTN;
+--			end if;
+--		end if;
+--	end process;
 
-	input_ports: process( clk, read_strobe)
-	begin
-		if(rising_edge(clk) and read_strobe='1') then
-			if(port_id=X"AF") then
-				in_port <= switch;
-			end if;
-			if(port_id=X"07") then
-				in_port <= BTN0 & BTN0 & BTN0 & BTN0 & BTN0 & BTN0 & BTN0 & BTN0;
-			end if;
-		end if;
-	end process;
+--	baud_rate: process(clk)
+--	begin
+--		if clk'event and clk = '1' then
+--			if baud_count = 651 then
+--				baud_count <= 0;
+--				--en_16_x_baud <= '1';
+--			else
+--				baud_count <= baud_count + 1;
+--				--en_16_x_baud <= '0';
+--			end if;
+--		end if;
+--	end process baud_rate;
 
-	baud_rate: process(clk)
-	begin
-		if clk'event and clk = '1' then
-			if baud_count = 325 then
-				baud_count <= 0;
-				en_16_x_baud <= '1';
-			else
-				baud_count <= baud_count + 1;
-				en_16_x_baud <= '0';
-			end if;
-		end if;
-	end process baud_rate;
+  rx: uart_rx6 
+  port map (            serial_in => uart_rx,
+                     en_16_x_baud => en_16_x_baud,
+                         data_out => uart_rx_data_out,
+                      buffer_read => read_available,
+              buffer_data_present => write_available,
+                 buffer_half_full => open,
+                      buffer_full => open,
+                     buffer_reset => '0',              
+                              clk => clk);
+
+
+
+  tx: uart_tx6 
+  port map (              data_in => uart_rx_data_out,
+                     en_16_x_baud => en_16_x_baud,
+                       serial_out => uart_tx,
+                     buffer_write => write_available,
+              buffer_data_present => read_available,
+                 buffer_half_full => open,
+                      buffer_full => open,
+                     buffer_reset => '0',              
+                              clk => clk);
+
+
 
 	--LED Output
+	LED <= "00000001";
+	
 end Behavioral;
