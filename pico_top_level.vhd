@@ -92,6 +92,21 @@ architecture behavioral of pico_top_level is
 							  clk : in std_logic);
 	end component;
 
+	COMPONENT nibble_to_ascii
+	PORT(
+		nibble : IN std_logic_vector(3 downto 0);          
+		ascii : OUT std_logic_vector(7 downto 0)
+		);
+	END COMPONENT;
+
+	COMPONENT ascii_to_nibble
+	PORT(
+		ascii : IN std_logic_vector(7 downto 0);          
+		nibble : OUT std_logic_vector(3 downto 0)
+		);
+	END COMPONENT;
+
+
 	signal         address : std_logic_vector(11 downto 0);
 	signal     instruction : std_logic_vector(17 downto 0);
 	signal     bram_enable : std_logic;
@@ -134,37 +149,37 @@ clk_to_baud_init: clk_to_baud
 --LED output
 LED <= kcpsm6_out_port;
 
---processor: kcpsm6
---    generic map (                 hwbuild => X"00", 
---                         interrupt_vector => X"3FF",
---                  scratch_pad_memory_size => 64)
---    port map(      address => address,
---               instruction => instruction,
---               bram_enable => bram_enable,
---                   port_id => port_id,
---              write_strobe => write_strobe,
---            k_write_strobe => k_write_strobe,
---                  out_port => kcpsm6_out_port,
---               read_strobe => read_strobe,
---                   in_port => kcpsm6_in_port,
---                 interrupt => interrupt,
---             interrupt_ack => interrupt_ack,
---                     sleep => kcpsm6_sleep,
---                     reset => kcpsm6_reset,
---                       clk => clk);
---
---  kcpsm6_sleep <= '0';
---  interrupt <= interrupt_ack;
+processor: kcpsm6
+    generic map (                 hwbuild => X"00", 
+                         interrupt_vector => X"3FF",
+                  scratch_pad_memory_size => 64)
+    port map(      address => address,
+               instruction => instruction,
+               bram_enable => bram_enable,
+                   port_id => port_id,
+              write_strobe => write_strobe,
+            k_write_strobe => k_write_strobe,
+                  out_port => kcpsm6_out_port,
+               read_strobe => read_strobe,
+                   in_port => kcpsm6_in_port,
+                 interrupt => interrupt,
+             interrupt_ack => interrupt_ack,
+                     sleep => kcpsm6_sleep,
+                     reset => kcpsm6_reset,
+                       clk => clk);
 
---  program_rom: trae
---    generic map(             C_FAMILY => "S6",   --Family 'S6', 'V6' or '7S'
---                    C_RAM_SIZE_KWORDS => 1,      --Program size '1', '2' or '4'
---                 C_JTAG_LOADER_ENABLE => 1)      --Include JTAG Loader when set to '1' 
---    port map(      address => address,      
---               instruction => instruction,
---                    enable => bram_enable,
---                       rdl => kcpsm6_reset,
---                       clk => clk);
+  kcpsm6_sleep <= '0';
+  interrupt <= interrupt_ack;
+
+  program_rom: trae
+    generic map(             C_FAMILY => "S6",   --Family 'S6', 'V6' or '7S'
+                    C_RAM_SIZE_KWORDS => 1,      --Program size '1', '2' or '4'
+                 C_JTAG_LOADER_ENABLE => 1)      --Include JTAG Loader when set to '1' 
+    port map(      address => address,      
+               instruction => instruction,
+                    enable => bram_enable,
+                       rdl => kcpsm6_reset,
+                       clk => clk);
 
 rx: uart_rx6 
   port map (            serial_in => serial_in,
@@ -191,21 +206,29 @@ rx: uart_rx6
 );
 
 --enable read/write
---buffer_read_sig <= '1' when port_id = X"02" and read_strobe = '1'
---						 else '0';
---
---buffer_write_sig <= '1' when port_id = X"03" and write_strobe = '1'
---						 else '0';
---
+buffer_read_sig <= '1' when port_id = X"02" and read_strobe = '1'
+						 else '0';
+
+buffer_write_sig <= '1' when port_id = X"03" and write_strobe = '1'
+						 else '0';
+
 ----input to kcpsm6
---kcpsm6_in_port <= data_out_sig when port_id = x"02" else
---						"0000000" & read_data_present when port_id =x"01" else
---						(others => '0');
---
+kcpsm6_in_port <= data_out_sig when port_id = x"02" else
+						"0000000" & read_data_present when port_id =x"01" else
+						(others => '0');
+
 ----input to uart_tx6	
---data_in_sig <= kcpsm6_out_port when port_id = x"03" else
---					(others => '0');
+data_in_sig <= kcpsm6_out_port when port_id = x"03" else
+					(others => '0');
 
-
+--nibble_ascii_hi: nibble_to_ascii PORT MAP(
+--	nibble => switch(7 downto 4),
+--	ascii =>  switch_char_hi	
+--);
+--
+--nibble_ascii_lo: nibble_to_ascii PORT MAP(
+--	nibble => switch(3 downto 0),
+--	ascii =>  switch_char_lo	
+--);	
 
 end behavioral;
